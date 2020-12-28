@@ -25,6 +25,21 @@ position_list = \
     "UTIL3" : ["PG", "SG", "SF", "PF", "C"],
 }
 
+scoring_settings = \
+    {
+        "FG" : 2,
+        "FGA" : -1,
+        "FT" : 1,
+        "FTA" : -1,
+        "3P" : 1,
+        "TRB" : 1,
+        "AST" : 2,
+        "STL" : 3,
+        "BLK" : 4,
+        "TOV" : -2,
+        "PTS" : 1
+    }
+
 player_list = \
 [
     "Simmons, Ben",
