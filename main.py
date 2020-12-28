@@ -1,13 +1,15 @@
-from urllib.request import urlopen
+import urllib.request as request
 from bs4 import BeautifulSoup
 import pandas as pd
 import datetime
 import re
 from variables import *
 
-team_opponents_dict = {}
-team_opponent_position_stats_dict = {}
+team_object_dict = {}
 player_object_dict = {}
+
+PROJECTED_STATS_WEIGHT = 0.90
+SEASON_STATS_WEIGHT = 0.10
 
 class Player():
     '''
@@ -37,11 +39,60 @@ class Player():
     def getPlayerCurrentSeasonStatsDict(self):
         return self.current_season_stats_dict
 
+    def tabulatePlayerESPNPointsPerGame(self):
+        '''
+        Return the current value of a player's ESPN points per game, using the
+        projected season stats and the current season stats, with more weight
+        given to the current season stats as the season progresses.
+        '''
+        points_based_on_projection = 0
+        points_based_on_season = 0
+
+        for stat, value in self.projection_dict.items():
+            if stat in scoring_settings.keys():
+                points_based_on_projection += value * scoring_settings[stat]
+
+        for stat, value in self.current_season_stats_dict.items():
+            if stat in scoring_settings.keys():
+                points_based_on_projection += value * scoring_settings[stat]
+
+        points_based_on_projection = points_based_on_projection * (self.minutes_per_game / 36.0) # Adjust projections for actual minutes the player plays
+
+        weighted_points_based_on_projection = points_based_on_projection * PROJECTED_STATS_WEIGHT
+        weighted_points_based_on_season = points_based_on_season * SEASON_STATS_WEIGHT
+
+        return weighted_points_based_on_projection + weighted_points_based_on_season
+
     def setPlayerScore(self, score):
         self.player_score = score
     
     def getPlayerScore(self):
         return self.player_score
+
+class Team():
+    '''
+    Class representing a team, containing information the opponents the team
+    will face for the given week and the team's opponent statistics by position.
+    '''
+    def __init__(self, team_name):
+        self.team_name = team_name
+        self.opponents_list = []
+        self.opponent_stats_dict = {}
+    
+    def getTeamName(self):
+        return self.team_name
+
+    def setOpponentsList(self, opponents_list):
+        self.opponents_list = opponents_list
+    
+    def getOpponentsList(self):
+        return self.opponents_list
+    
+    def setOpponentStatsDict(self, opponent_stats_dict):
+        self.opponent_stats_dict = opponent_stats_dict
+
+    def getOpponentStatsDict(self,):
+        return self.opponent_stats_dict
 
 def scrape_bbref_player(player_name):
     '''
@@ -49,7 +100,7 @@ def scrape_bbref_player(player_name):
     object containing the player's name, team, minutes per game, projection dict,
     and current season stats dict.
     '''
-    html = urlopen(player_urls[player_name])
+    html = request.urlopen(player_urls[player_name])
     soup = BeautifulSoup(html, features="lxml")
 
     # Grab projections, which are per 36 mins
@@ -81,7 +132,7 @@ def get_team_opponents_for_week(start_date):
     '''
     for team_name in team_abbreviation_to_name_dict.keys():
         opponent_list = []
-        html = urlopen(schedule_url.format(team_name))
+        html = request.urlopen(schedule_url.format(team_name))
         soup = BeautifulSoup(html, features="lxml")
         games_table = soup.findAll('table',attrs={'id':'games'})[0]
 
@@ -100,7 +151,7 @@ def get_team_opponents_for_week(start_date):
             opponent_name = games_row.findChild('td',attrs={'data-stat':'opp_name'}).text
             opponent_list.append(opponent_full_name_dict[opponent_name])
 
-        team_opponents_dict[team_name] = opponent_list
+        team_object_dict[team_name].setOpponentsList(opponent_list)
 
 def get_team_opponent_stats_by_position():
     '''
@@ -111,7 +162,7 @@ def get_team_opponent_stats_by_position():
     attempted_pattern = re.compile(r'-([0-9]+\.[0-9]+)')
 
     for position in opponent_position_statistics_urls.keys():
-        html = urlopen(opponent_position_statistics_urls[position])
+        html = request.urlopen(opponent_position_statistics_urls[position])
         soup = BeautifulSoup(html, features="lxml")
 
         for team_abbrev, team_name in team_abbreviation_to_name_dict.items():
@@ -135,17 +186,16 @@ def get_team_opponent_stats_by_position():
             team_opponent_position_stats["FT"] = float(re.findall(made_pattern, raw_stat_table_row[17].text)[0])
             team_opponent_position_stats["FTA"] = float(re.findall(attempted_pattern, raw_stat_table_row[17].text)[0])
 
-            if team_abbrev not in team_opponent_position_stats_dict.keys():
-                team_opponent_position_stats_dict[team_abbrev] = {position : team_opponent_position_stats}
-            else:
-                team_opponent_position_stats_dict[team_abbrev][position] = team_opponent_position_stats
-
-    print(team_opponent_position_stats_dict)
+            team_object_dict[team_abbrev].getOpponentStatsDict()[position] = team_opponent_position_stats
 
 if __name__ == "__main__":
     # Collect the projections and stats for each player on the team
     for player_name in player_list:
         player_object_dict[player_name] = scrape_bbref_player(player_name)
+
+    # Create objects for each team
+    for team_name in team_abbreviation_to_name_dict.keys():
+        team_object_dict[team_name] = Team(team_name)
 
     # Collect the opponents for each team for the following week    
     get_team_opponents_for_week(datetime.datetime.today())
