@@ -267,6 +267,10 @@ def generate_optimal_lineup():
     print_optimal_lineup(best_lineup, high_score, tested_permutations)
 
 def print_optimal_lineup(best_lineup, high_score, tested_permutations):
+    start_date = datetime.datetime.today() + datetime.timedelta(days = 7 - datetime.datetime.today().weekday())
+
+    print("Optimal lineup for the week beginning {:04}-{:02}-{:02}\n".format(start_date.year, start_date.month, start_date.day))
+
     for index in range(len(best_lineup)):
         print(f"{fantasy_team_position_list[index]}: {best_lineup[index]} - Projected Score: {player_object_dict[best_lineup[index]].getPlayerScore()}")
 
