@@ -5,6 +5,16 @@ import datetime
 import re
 from variables import *
 
+'''
+To-Dos:
+
+1. Automate weighting for projected/real stats
+2. Automate pulling URLs for players
+3. Access ESPN lineup to pull players without having to manually enter them (not sure if this is doable)
+4. Same for scoring settings
+5. Same for waivers?
+'''
+
 team_object_dict = {}
 player_object_dict = {}
 
