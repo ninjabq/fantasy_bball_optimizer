@@ -226,12 +226,51 @@ def generate_player_score(player):
     adjusted_score = raw_score * number_of_games
     if number_of_games == 4:
         adjusted_score = adjusted_score * 0.90
-        
-    
-    print(f'Player: {player.player_name}, Adjusted Score: {adjusted_score}')
 
     player.setPlayerScore(adjusted_score)
 
+def recurse_lineup(fantasy_position_to_player_dict, current_lineup_players, position_index, current_score, high_score, best_lineup, tested_permutations):
+    '''
+    Recursively check the given position and dict's permutations until we get to a full lineup. Once we get to a full
+    lineup, check the score and see if it higher.
+    '''
+    for player in fantasy_position_to_player_dict[fantasy_team_position_list[position_index]]:
+        if player not in current_lineup_players:
+            current_score += player_object_dict[player].getPlayerScore()
+            current_lineup_players.append(player)
+            if position_index == (len(fantasy_position_to_player_dict.keys()) - 1):
+                tested_permutations += 1
+                if current_score > high_score:
+                    high_score = current_score
+                    best_lineup = [player for player in current_lineup_players]
+            else:
+                high_score, best_lineup, tested_permutations = recurse_lineup(fantasy_position_to_player_dict, current_lineup_players, position_index + 1, current_score, high_score, best_lineup, tested_permutations)
+            current_score -= player_object_dict[player].getPlayerScore()
+            current_lineup_players.remove(player)
+    return high_score, best_lineup, tested_permutations
+
+def generate_optimal_lineup():
+    '''
+    Iterate through every possible lineup and generate scores for each to
+    determine the best lineup.
+    '''
+    fantasy_position_to_player_dict = {"PG" : [], "SG" : [], "SF" : [], "PF" : [], "C" : [], "G" : [], "F" : [], "UTIL1" : [], "UTIL2" : [], "UTIL3" : []}
+
+    for position_group in fantasy_team_position_dict.keys():
+        for position in fantasy_team_position_dict[position_group]:
+            for player in player_positions.keys():
+                if position in player_positions[player]:
+                    fantasy_position_to_player_dict[position_group].append(player)
+    
+    high_score, best_lineup, tested_permutations = recurse_lineup(fantasy_position_to_player_dict, [], 0, 0, 0, [], 0)
+
+    print_optimal_lineup(best_lineup, high_score, tested_permutations)
+
+def print_optimal_lineup(best_lineup, high_score, tested_permutations):
+    for index in range(len(best_lineup)):
+        print(f"{fantasy_team_position_list[index]}: {best_lineup[index]} - Projected Score: {player_object_dict[best_lineup[index]].getPlayerScore()}")
+
+    print(f"\nTotal Projected Score: {high_score}\nNumber of Tested Permutations: {tested_permutations}")                                     
 
 if __name__ == "__main__":
     # Create objects for each team
@@ -250,4 +289,4 @@ if __name__ == "__main__":
         player_object_dict[player_name] = scrape_bbref_player(player_name)
         generate_player_score(player_object_dict[player_name])
 
-    pass
+    generate_optimal_lineup()

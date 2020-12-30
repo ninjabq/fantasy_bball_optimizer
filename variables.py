@@ -11,7 +11,9 @@ opponent_position_statistics_urls = \
 
 schedule_url = "https://www.basketball-reference.com/teams/{}/2021_games.html"
 
-position_list = \
+fantasy_team_position_list = ["PG", "SG", "SF", "PF", "C", "G", "F", "UTIL1", "UTIL2", "UTIL3"]
+
+fantasy_team_position_dict = \
 {
     "PG" : ["PG"],
     "SG" : ["SG"],
@@ -71,7 +73,7 @@ player_positions = \
     "Vucevic, Nikola" : ["C"],
     "Plumlee, Mason" : ["C"],
     "Warren, T.J." : ["SF"],
-    "Green, Draymond" : ["PF"],
+#    "Green, Draymond" : ["PF"],
     "Ingles, Joe" : ["SF"],
     "Reddish, Cam" : ["SF", "SG"],
 }
