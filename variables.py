@@ -1,4 +1,10 @@
 current_year = 21
+espn_league_id = 984966540
+team_id = 4
+
+espn_league_base_url = f'https://fantasy.espn.com/apis/v3/games/fba/seasons/20{current_year}/segments/0/leagues/{espn_league_id}'
+
+
 
 opponent_position_statistics_urls = \
 {
@@ -10,6 +16,8 @@ opponent_position_statistics_urls = \
 }
 
 schedule_url = "https://www.basketball-reference.com/teams/{}/2021_games.html"
+
+bbref_base_url = "https://www.basketball-reference.com/players/{}/{}{}01.html"
 
 fantasy_team_position_list = ["PG", "SG", "SF", "PF", "C", "G", "F", "UTIL1", "UTIL2", "UTIL3"]
 
@@ -41,60 +49,6 @@ scoring_settings = \
         "TOV" : -2,
         "PTS" : 1
     }
-
-player_list = \
-[
-    "Simmons, Ben",
-    "Harden, James",
-    "Bazley, Darius",
-    "Gallinari, Danilo",
-    "Bryant, Thomas",
-    "Wright, Delon",
-    "Middleton, Khris",
-    "Drummond, Andre",
-    "Vucevic, Nikola",
-    "Plumlee, Mason",
-    "Warren, T.J.",
-#    "Green, Draymond", have to ignore draymond for now cuz he aint played yet
-    "Ingles, Joe",
-    "Reddish, Cam",
-]
-
-player_positions = \
-{
-    "Simmons, Ben" : ["PG"],
-    "Harden, James" : ["SG", "PG"],
-    "Bazley, Darius" : ["SF"],
-    "Gallinari, Danilo" : ["PF", "SF"],
-    "Bryant, Thomas" : ["C"],
-    "Wright, Delon" : ["SG", "PG"],
-    "Middleton, Khris" : ["SF", "SG"],
-    "Drummond, Andre" : ["C"],
-    "Vucevic, Nikola" : ["C"],
-    "Plumlee, Mason" : ["C"],
-    "Warren, T.J." : ["SF"],
-#    "Green, Draymond" : ["PF"],
-    "Ingles, Joe" : ["SF"],
-    "Reddish, Cam" : ["SF", "SG"],
-}
-
-player_urls = \
-{
-    "Simmons, Ben" : "https://www.basketball-reference.com/players/s/simmobe01.html",
-    "Harden, James" : "https://www.basketball-reference.com/players/h/hardeja01.html",
-    "Bazley, Darius" : "https://www.basketball-reference.com/players/b/bazleda01.html",
-    "Gallinari, Danilo" : "https://www.basketball-reference.com/players/g/gallida01.html",
-    "Bryant, Thomas" : "https://www.basketball-reference.com/players/b/bryanth01.html",
-    "Wright, Delon" : "https://www.basketball-reference.com/players/w/wrighde01.html",
-    "Middleton, Khris" : "https://www.basketball-reference.com/players/m/middlkh01.html",
-    "Drummond, Andre" : "https://www.basketball-reference.com/players/d/drumman01.html",
-    "Vucevic, Nikola" : "https://www.basketball-reference.com/players/v/vucevni01.html",
-    "Plumlee, Mason" : "https://www.basketball-reference.com/players/p/plumlma01.html",
-    "Warren, T.J." : "https://www.basketball-reference.com/players/w/warretj01.html",
-    "Green, Draymond" : "https://www.basketball-reference.com/players/g/greendr01.html",
-    "Ingles, Joe" : "https://www.basketball-reference.com/players/i/inglejo01.html",
-    "Reddish, Cam" : "https://www.basketball-reference.com/players/r/reddica01.html",
-}
 
 projection_headers_dict = \
 {

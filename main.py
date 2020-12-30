@@ -3,14 +3,17 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import datetime
 import re
+import requests
+import json
 from variables import *
+from cookies import *
 
 '''
 To-Dos:
 
 1. Automate weighting for projected/real stats
-2. Automate pulling URLs for players
-3. Access ESPN lineup to pull players without having to manually enter them (not sure if this is doable)
+2. Automate pulling URLs for players - DONE
+3. Access ESPN lineup to pull players without having to manually enter them (not sure if this is doable) - DONE
 4. Same for scoring settings
 5. Same for waivers?
 '''
@@ -27,25 +30,47 @@ class Player():
     tabulate a score for the player for the given week (stored in the object)
     which will then be compared to set the lineup.
     '''
-    def __init__(self, player_name, team, minutes_per_game, projection_dict, current_season_stats_dict):
+    def __init__(self, player_name):
         self.player_name = player_name
-        self.team = team
-        self.minutes_per_game = minutes_per_game
-        self.projection_dict = projection_dict # Per 36 minutes
-        self.current_season_stats_dict = current_season_stats_dict # Per game
+        self.player_positions = []
+        self.player_bbref_url = ""
 
     def getPlayerName(self):
         return self.player_name
     
+    def setPlayerTeam(self, team):
+        self.team = team
+
     def getPlayerTeam(self):
         return self.team
-    
+
+    def addPlayerPosition(self, position):
+        self.player_positions.append(position)
+
+    def getPlayerPositions(self):
+        return self.player_positions
+
+    def setBBRefUrl(self, url):
+        self.player_bbref_url = url
+
+    def getBBRefUrl(self):
+        return self.player_bbref_url
+
+    def setPlayerMinutesPerGame(self, minutes_per_game):
+        self.minutes_per_game = minutes_per_game
+
     def getPlayerMinutesPerGame(self):
         return self.minutes_per_game
     
+    def setPlayerProjectionDict(self, projection_dict):
+        self.projection_dict = projection_dict
+
     def getPlayerProjectionDict(self):
         return self.projection_dict
     
+    def setPlayerCurrentSeasonStatsDict(self, current_season_stats_dict):
+        self.current_season_stats_dict = current_season_stats_dict
+
     def getPlayerCurrentSeasonStatsDict(self):
         return self.current_season_stats_dict
 
@@ -117,13 +142,38 @@ class Team():
         
         return points
 
-def scrape_bbref_player(player_name):
+def get_players_from_espn():
+    '''
+    Retrieve the team's players from ESPN.
+    '''
+    r = requests.get(espn_league_base_url, params = {'view' : 'mRoster'}, cookies = {'swid' : SWID, 'espn_s2' : ESPN_S2})
+    json_request = json.loads(r.content)
+
+    roster = json_request['teams'][team_id - 1]['roster']['entries']
+
+    for player_index in range(len(roster)):
+        player_json = roster[player_index]['playerPoolEntry']['player']
+        player_object = Player(player_json['fullName'])
+        for position_index in range(len(player_json['eligibleSlots'])):
+            position_id = player_json['eligibleSlots'][position_index]
+            if position_id <= 4:
+                player_object.addPlayerPosition(fantasy_team_position_list[position_id])
+        player_last_name = player_json['lastName'].replace('.','')
+        player_first_name = player_json['firstName'].replace('.', '')
+        player_object.setBBRefUrl(bbref_base_url.format(player_last_name[0], player_last_name[0:5], player_first_name[0:2]).lower())
+        scrape_bbref_player(player_object)
+        player_object_dict[player_json['fullName']] = player_object
+
+def scrape_bbref_player(player):
     '''
     Scrape the Basketball Reference page for the given player and return a player
     object containing the player's name, team, minutes per game, projection dict,
     and current season stats dict.
+
+    The index errors in this function are there to catch instances where a player
+    has not yet played this season, and therefore has not accrued any stats.
     '''
-    html = request.urlopen(player_urls[player_name])
+    html = request.urlopen(player.getBBRefUrl())
     soup = BeautifulSoup(html, features="lxml")
 
     # Grab projections, which are per 36 mins
@@ -132,20 +182,34 @@ def scrape_bbref_player(player_name):
     for stat in projection_headers_dict.keys():
         projection_dict[projection_headers_dict[stat]] = float(projection[0].findAll('td', attrs={'data-stat':stat})[0].text)
 
+    player.setPlayerProjectionDict(projection_dict)
+
     # Grab current season stats, which are per game
     current_season_stats_dict = {}
     current_season_stats = soup.findAll('tr',attrs={'id':f'per_game.20{current_year}'})
-    
-    for stat in current_season_stats_headers_dict.keys():
-        current_season_stats_dict[current_season_stats_headers_dict[stat]] = float(current_season_stats[0].findAll('td', attrs={'data-stat':stat})[0].text)
+
+    try:
+        for stat in current_season_stats_headers_dict.keys():
+            current_season_stats_dict[current_season_stats_headers_dict[stat]] = float(current_season_stats[0].findAll('td', attrs={'data-stat':stat})[0].text)
+    except IndexError:
+        for stat in current_season_stats_headers_dict.keys():
+            current_season_stats_dict[current_season_stats_headers_dict[stat]] = 0.0
+
+    player.setPlayerCurrentSeasonStatsDict(current_season_stats_dict)
 
     # Grab the player's team
-    player_team = current_season_stats[0].findAll('td', attrs={'data-stat':'team_id'})[0].text
+    try:
+        player_team = current_season_stats[0].findAll('td', attrs={'data-stat':'team_id'})[0].text
+    except IndexError:
+        player_team = soup.findAll('tr',attrs={'id':f'per_game.20{current_year - 1}'})[0].findAll('td', attrs={'data-stat':'team_id'})[0].text
+    player.setPlayerTeam(player_team)
 
     # Grab the player's minutes per game
-    player_minutes_per_game = float(current_season_stats[0].findAll('td', attrs={'data-stat':'mp_per_g'})[0].text)
-
-    return Player(player_name, player_team, player_minutes_per_game, projection_dict, current_season_stats_dict)
+    try:
+        player_minutes_per_game = float(current_season_stats[0].findAll('td', attrs={'data-stat':'mp_per_g'})[0].text)
+    except IndexError:
+        player_minutes_per_game = 0.0
+    player.setPlayerMinutesPerGame(player_minutes_per_game)
 
 def get_team_opponents_for_week(start_date):
     '''
@@ -226,7 +290,7 @@ def generate_player_score(player):
     team_opponents_list = team_object_dict[player.team].opponents_list
 
     for team in team_opponents_list:
-        espn_points_for_position_for_opponents += team_object_dict[team].tabulateTeamPositionalESPNPoints(player_positions[player.player_name][0])
+        espn_points_for_position_for_opponents += team_object_dict[team].tabulateTeamPositionalESPNPoints(player.getPlayerPositions()[0])
 
     number_of_games = len(team_opponents_list)
     average_espn_points_for_position_for_opponents = espn_points_for_position_for_opponents / number_of_games
@@ -268,9 +332,9 @@ def generate_optimal_lineup():
 
     for position_group in fantasy_team_position_dict.keys():
         for position in fantasy_team_position_dict[position_group]:
-            for player in player_positions.keys():
-                if position in player_positions[player]:
-                    fantasy_position_to_player_dict[position_group].append(player)
+            for player_name, player in player_object_dict.items():
+                if position in player.getPlayerPositions():
+                    fantasy_position_to_player_dict[position_group].append(player_name)
     
     high_score, best_lineup, tested_permutations = recurse_lineup(fantasy_position_to_player_dict, [], 0, 0, 0, [], 0)
 
@@ -299,8 +363,8 @@ if __name__ == "__main__":
 
     # Collect the projections and stats for each player on the team, and generate
     # scores
-    for player_name in player_list:
-        player_object_dict[player_name] = scrape_bbref_player(player_name)
-        generate_player_score(player_object_dict[player_name])
+    get_players_from_espn()
+    for player_name, player in player_object_dict.items():
+        generate_player_score(player)
 
     generate_optimal_lineup()
