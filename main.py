@@ -94,6 +94,19 @@ class Team():
     def getOpponentStatsDict(self,):
         return self.opponent_stats_dict
 
+    def tabulateTeamPositionalESPNPoints(self, position):
+        '''
+        For the given position, determine the number of fantasy points that position
+        scores against this team.
+        '''
+        points = 0
+
+        for stat, value in self.opponent_stats_dict[position].items():
+            if stat in scoring_settings.keys():
+                points += value * scoring_settings[stat]
+        
+        return points
+
 def scrape_bbref_player(player_name):
     '''
     Scrape the Basketball Reference page for the given player and return a player
@@ -120,7 +133,7 @@ def scrape_bbref_player(player_name):
     player_team = current_season_stats[0].findAll('td', attrs={'data-stat':'team_id'})[0].text
 
     # Grab the player's minutes per game
-    player_minutes_per_game = current_season_stats[0].findAll('td', attrs={'data-stat':'mp_per_g'})[0].text
+    player_minutes_per_game = float(current_season_stats[0].findAll('td', attrs={'data-stat':'mp_per_g'})[0].text)
 
     return Player(player_name, player_team, player_minutes_per_game, projection_dict, current_season_stats_dict)
 
@@ -188,11 +201,39 @@ def get_team_opponent_stats_by_position():
 
             team_object_dict[team_abbrev].getOpponentStatsDict()[position] = team_opponent_position_stats
 
-if __name__ == "__main__":
-    # Collect the projections and stats for each player on the team
-    for player_name in player_list:
-        player_object_dict[player_name] = scrape_bbref_player(player_name)
+def generate_player_score(player):
+    '''
+    First, get the number of fantasy points we can project for this player on a
+    per-game basis. Then, get the number of fantasy points this player's position
+    scores against his opponents for this week. Take the average of this number
+    per-game, and find the mean between this number and the player's fantasy
+    points. Finally, multiply this by the number of games the player will
+    play this week, with a small adjustment to consider the fact that a 4 game
+    slate may end up with a rest day for the player.
+    '''
+    espn_points_for_player = player.tabulatePlayerESPNPointsPerGame()
+    espn_points_for_position_for_opponents = 0
+    team_opponents_list = team_object_dict[player.team].opponents_list
 
+    for team in team_opponents_list:
+        espn_points_for_position_for_opponents += team_object_dict[team].tabulateTeamPositionalESPNPoints(player_positions[player.player_name][0])
+
+    number_of_games = len(team_opponents_list)
+    average_espn_points_for_position_for_opponents = espn_points_for_position_for_opponents / number_of_games
+
+    raw_score = (espn_points_for_player + average_espn_points_for_position_for_opponents) / 2
+    
+    adjusted_score = raw_score * number_of_games
+    if number_of_games == 4:
+        adjusted_score = adjusted_score * 0.90
+        
+    
+    print(f'Player: {player.player_name}, Adjusted Score: {adjusted_score}')
+
+    player.setPlayerScore(adjusted_score)
+
+
+if __name__ == "__main__":
     # Create objects for each team
     for team_name in team_abbreviation_to_name_dict.keys():
         team_object_dict[team_name] = Team(team_name)
@@ -202,3 +243,11 @@ if __name__ == "__main__":
 
     # Collect the opponent stats by position for each team
     get_team_opponent_stats_by_position()
+
+    # Collect the projections and stats for each player on the team, and generate
+    # scores
+    for player_name in player_list:
+        player_object_dict[player_name] = scrape_bbref_player(player_name)
+        generate_player_score(player_object_dict[player_name])
+
+    pass
