@@ -2,9 +2,9 @@ current_year = 21
 espn_league_id = 984966540
 team_id = 4
 
+total_games_in_season = 72
+
 espn_league_base_url = f'https://fantasy.espn.com/apis/v3/games/fba/seasons/20{current_year}/segments/0/leagues/{espn_league_id}'
-
-
 
 opponent_position_statistics_urls = \
 {
@@ -15,8 +15,8 @@ opponent_position_statistics_urls = \
     "PG" : f"http://www.hoopsstats.com/basketball/fantasy/nba/opponentstats/{current_year}/12/eff/1-1",
 }
 
-schedule_url = "https://www.basketball-reference.com/teams/{}/2021_games.html"
-
+schedule_url = "https://www.basketball-reference.com/teams/{}/20{}_games.html"
+team_page_url = "https://www.basketball-reference.com/teams/{}/20{}.html"
 bbref_base_url = "https://www.basketball-reference.com/players/{}/{}{}0{}.html"
 
 fantasy_team_position_list = ["PG", "SG", "SF", "PF", "C", "G", "F", "UTIL1", "UTIL2", "UTIL3"]

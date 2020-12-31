@@ -12,19 +12,16 @@ from cookies import *
 '''
 To-Dos:
 
-1. Automate weighting for projected/real stats
+1. Automate weighting for projected/real stats - DONE
 2. Automate pulling URLs for players - DONE
 3. Access ESPN lineup to pull players without having to manually enter them (not sure if this is doable) - DONE
-4. Same for scoring settings
+4. Same for scoring settings - DONE
 5. Same for waivers?
 '''
 
 team_object_dict = {}
 player_object_dict = {}
 scoring_settings = {}
-
-PROJECTED_STATS_WEIGHT = 0.90
-SEASON_STATS_WEIGHT = 0.10
 
 class Player():
     '''
@@ -104,9 +101,11 @@ class Player():
 
         points_based_on_projection = points_based_on_projection * (self.minutes_per_game / 36.0) # Adjust projections for actual minutes the player plays
 
+        current_season_stats_weight, projected_stats_weight = calculateStatWeighting(self.team)
+
         if self.has_projection:
-            weighted_points_based_on_projection = points_based_on_projection * PROJECTED_STATS_WEIGHT
-            weighted_points_based_on_season = points_based_on_season * SEASON_STATS_WEIGHT
+            weighted_points_based_on_projection = points_based_on_projection * projected_stats_weight
+            weighted_points_based_on_season = points_based_on_season * current_season_stats_weight
 
             return weighted_points_based_on_projection + weighted_points_based_on_season
         else:
@@ -155,6 +154,25 @@ class Team():
                 points += value * scoring_settings[stat]
         
         return points
+
+def calculateStatWeighting(team):
+    '''
+    Get the weight for the current season stats and projected stats. This is
+    based on the given team's number of games played, such that more weight will
+    be given to the current season stats as the season progresses. Once the team
+    has played half of its games for the season, the projected stats will no
+    longer have any bearing.
+    '''
+    record_pattern = re.compile(r' (\d+)\-(\d+),')
+    html = request.urlopen(team_page_url.format(team, current_year))
+    soup = BeautifulSoup(html, features="lxml")
+    record = re.findall(record_pattern, soup.findAll('p')[2].text)
+    games_played = int(record[0][0]) + int(record[0][1])
+
+    current_season_stats_weight = float(games_played / total_games_in_season) * 2.0
+    projected_stats_weight = max(1.0 - current_season_stats_weight, 0)
+
+    return current_season_stats_weight, projected_stats_weight
 
 def get_scoring_settings_from_espn():
     '''
@@ -276,7 +294,7 @@ def get_team_opponents_for_week(start_date):
     '''
     for team_name in team_abbreviation_to_name_dict.keys():
         opponent_list = []
-        html = request.urlopen(schedule_url.format(team_name))
+        html = request.urlopen(schedule_url.format(team_name, current_year))
         soup = BeautifulSoup(html, features="lxml")
         games_table = soup.findAll('table',attrs={'id':'games'})[0]
 
@@ -410,8 +428,6 @@ def print_optimal_lineup(best_lineup, high_score, tested_permutations):
 if __name__ == "__main__":
     # Get league scoring settings
     get_scoring_settings_from_espn()
-
-    print(scoring_settings)
 
     # Create objects for each team
     for team_name in team_abbreviation_to_name_dict.keys():
