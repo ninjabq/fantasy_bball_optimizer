@@ -5,6 +5,7 @@ import datetime
 import re
 import requests
 import json
+from unidecode import unidecode
 from variables import *
 from cookies import *
 
@@ -34,6 +35,7 @@ class Player():
         self.player_name = player_name
         self.player_positions = []
         self.player_bbref_url = ""
+        self.has_projection = True
 
     def getPlayerName(self):
         return self.player_name
@@ -47,6 +49,7 @@ class Player():
     def addPlayerPosition(self, position):
         self.player_positions.append(position)
 
+
     def getPlayerPositions(self):
         return self.player_positions
 
@@ -55,6 +58,12 @@ class Player():
 
     def getBBRefUrl(self):
         return self.player_bbref_url
+
+    def setPlayerHasProjection(self, player_has_projection):
+        self.has_projection = player_has_projection
+    
+    def getPlayerHasProjection(self):
+        return self.has_projection
 
     def setPlayerMinutesPerGame(self, minutes_per_game):
         self.minutes_per_game = minutes_per_game
@@ -83,9 +92,10 @@ class Player():
         points_based_on_projection = 0
         points_based_on_season = 0
 
-        for stat, value in self.projection_dict.items():
-            if stat in scoring_settings.keys():
-                points_based_on_projection += value * scoring_settings[stat]
+        if self.has_projection:
+            for stat, value in self.projection_dict.items():
+                if stat in scoring_settings.keys():
+                    points_based_on_projection += value * scoring_settings[stat]
 
         for stat, value in self.current_season_stats_dict.items():
             if stat in scoring_settings.keys():
@@ -93,10 +103,13 @@ class Player():
 
         points_based_on_projection = points_based_on_projection * (self.minutes_per_game / 36.0) # Adjust projections for actual minutes the player plays
 
-        weighted_points_based_on_projection = points_based_on_projection * PROJECTED_STATS_WEIGHT
-        weighted_points_based_on_season = points_based_on_season * SEASON_STATS_WEIGHT
+        if self.has_projection:
+            weighted_points_based_on_projection = points_based_on_projection * PROJECTED_STATS_WEIGHT
+            weighted_points_based_on_season = points_based_on_season * SEASON_STATS_WEIGHT
 
-        return weighted_points_based_on_projection + weighted_points_based_on_season
+            return weighted_points_based_on_projection + weighted_points_based_on_season
+        else:
+            return points_based_on_season
 
     def setPlayerScore(self, score):
         self.player_score = score
@@ -160,11 +173,35 @@ def get_players_from_espn():
                 player_object.addPlayerPosition(fantasy_team_position_list[position_id])
         player_last_name = player_json['lastName'].replace('.','')
         player_first_name = player_json['firstName'].replace('.', '')
-        player_object.setBBRefUrl(bbref_base_url.format(player_last_name[0], player_last_name[0:5], player_first_name[0:2]).lower())
-        scrape_bbref_player(player_object)
+        scrape_bbref_player(player_object, player_json['fullName'], player_last_name, player_first_name)
         player_object_dict[player_json['fullName']] = player_object
 
-def scrape_bbref_player(player):
+def get_bbref_url(player_object, player_full_name, player_last_name, player_first_name):
+    '''
+    Get the URL for this player's basketball-reference.com page.
+    '''
+    for attempts in range(1,10):
+        bbref_url = bbref_base_url.format(player_last_name[0], player_last_name[0:5], player_first_name[0:2], attempts).lower()
+        html = request.urlopen(bbref_url)
+        soup = BeautifulSoup(html, features="lxml")
+
+        try:
+            soup.findAll('table', attrs={'id':'projection'})[0]
+        except IndexError:
+            try:
+                soup.findAll('tr',attrs={'id':f'per_game.20{current_year}'})[0]
+            except IndexError:
+                continue
+
+        if player_full_name != unidecode(soup.find('h1', attrs={'itemprop' : 'name' }).text.replace('\n','')):
+            continue
+
+        return bbref_url
+
+    raise Exception(f"Can't find the basketball reference page for payer {player_full_name}")
+
+
+def scrape_bbref_player(player_object, player_full_name, player_last_name, player_first_name):
     '''
     Scrape the Basketball Reference page for the given player and return a player
     object containing the player's name, team, minutes per game, projection dict,
@@ -173,16 +210,23 @@ def scrape_bbref_player(player):
     The index errors in this function are there to catch instances where a player
     has not yet played this season, and therefore has not accrued any stats.
     '''
-    html = request.urlopen(player.getBBRefUrl())
+
+    bbref_url = get_bbref_url(player_object, player_full_name, player_last_name, player_first_name)
+
+    html = request.urlopen(bbref_url)
     soup = BeautifulSoup(html, features="lxml")
 
     # Grab projections, which are per 36 mins
     projection_dict = {}
-    projection = soup.findAll('table', attrs={'id':'projection'})
-    for stat in projection_headers_dict.keys():
-        projection_dict[projection_headers_dict[stat]] = float(projection[0].findAll('td', attrs={'data-stat':stat})[0].text)
+    try:
+        projection = soup.findAll('table', attrs={'id':'projection'})
+        for stat in projection_headers_dict.keys():
+            projection_dict[projection_headers_dict[stat]] = float(projection[0].findAll('td', attrs={'data-stat':stat})[0].text)
+    except IndexError:
+        # If we've gotten this far and still have an IndexError, then this is probably a rookie who just has no projection
+        player_object.setPlayerHasProjection(False)
 
-    player.setPlayerProjectionDict(projection_dict)
+    player_object.setPlayerProjectionDict(projection_dict)
 
     # Grab current season stats, which are per game
     current_season_stats_dict = {}
@@ -195,21 +239,21 @@ def scrape_bbref_player(player):
         for stat in current_season_stats_headers_dict.keys():
             current_season_stats_dict[current_season_stats_headers_dict[stat]] = 0.0
 
-    player.setPlayerCurrentSeasonStatsDict(current_season_stats_dict)
+    player_object.setPlayerCurrentSeasonStatsDict(current_season_stats_dict)
 
     # Grab the player's team
     try:
         player_team = current_season_stats[0].findAll('td', attrs={'data-stat':'team_id'})[0].text
     except IndexError:
         player_team = soup.findAll('tr',attrs={'id':f'per_game.20{current_year - 1}'})[0].findAll('td', attrs={'data-stat':'team_id'})[0].text
-    player.setPlayerTeam(player_team)
+    player_object.setPlayerTeam(player_team)
 
     # Grab the player's minutes per game
     try:
         player_minutes_per_game = float(current_season_stats[0].findAll('td', attrs={'data-stat':'mp_per_g'})[0].text)
     except IndexError:
         player_minutes_per_game = 0.0
-    player.setPlayerMinutesPerGame(player_minutes_per_game)
+    player_object.setPlayerMinutesPerGame(player_minutes_per_game)
 
 def get_team_opponents_for_week(start_date):
     '''

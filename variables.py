@@ -1,6 +1,6 @@
 current_year = 21
 espn_league_id = 984966540
-team_id = 4
+team_id = 7
 
 espn_league_base_url = f'https://fantasy.espn.com/apis/v3/games/fba/seasons/20{current_year}/segments/0/leagues/{espn_league_id}'
 
@@ -17,7 +17,7 @@ opponent_position_statistics_urls = \
 
 schedule_url = "https://www.basketball-reference.com/teams/{}/2021_games.html"
 
-bbref_base_url = "https://www.basketball-reference.com/players/{}/{}{}01.html"
+bbref_base_url = "https://www.basketball-reference.com/players/{}/{}{}0{}.html"
 
 fantasy_team_position_list = ["PG", "SG", "SF", "PF", "C", "G", "F", "UTIL1", "UTIL2", "UTIL3"]
 
