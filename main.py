@@ -21,6 +21,7 @@ To-Dos:
 
 team_object_dict = {}
 player_object_dict = {}
+scoring_settings = {}
 
 PROJECTED_STATS_WEIGHT = 0.90
 SEASON_STATS_WEIGHT = 0.10
@@ -99,7 +100,7 @@ class Player():
 
         for stat, value in self.current_season_stats_dict.items():
             if stat in scoring_settings.keys():
-                points_based_on_projection += value * scoring_settings[stat]
+                points_based_on_season += value * scoring_settings[stat]
 
         points_based_on_projection = points_based_on_projection * (self.minutes_per_game / 36.0) # Adjust projections for actual minutes the player plays
 
@@ -154,6 +155,18 @@ class Team():
                 points += value * scoring_settings[stat]
         
         return points
+
+def get_scoring_settings_from_espn():
+    '''
+    Retrieve the league's scoring settings from ESPN.
+    '''
+    r = requests.get(espn_league_base_url, params = {'view' : 'mSettings'}, cookies = {'swid' : SWID, 'espn_s2' : ESPN_S2})
+    json_request = json.loads(r.content)
+
+    scoring_items = json_request['settings']['scoringSettings']['scoringItems']
+
+    for scoring_item in scoring_items:
+        scoring_settings[espn_stat_ids_dict[scoring_item['statId']]] = scoring_item['points']
 
 def get_players_from_espn():
     '''
@@ -302,7 +315,7 @@ def get_team_opponent_stats_by_position():
             raw_stat_table_row = soup.find('a',text=team_name).find_parent('tr').findAll('td')
             team_opponent_position_stats["MP"] = float(raw_stat_table_row[3].text)
             team_opponent_position_stats["PTS"] = float(raw_stat_table_row[4].text)
-            team_opponent_position_stats["TRB"] = float(raw_stat_table_row[5].text)
+            team_opponent_position_stats["REB"] = float(raw_stat_table_row[5].text)
             team_opponent_position_stats["AST"] = float(raw_stat_table_row[6].text)
             team_opponent_position_stats["STL"] = float(raw_stat_table_row[7].text)
             team_opponent_position_stats["BLK"] = float(raw_stat_table_row[8].text)
@@ -310,11 +323,11 @@ def get_team_opponent_stats_by_position():
             team_opponent_position_stats["PF"] = float(raw_stat_table_row[10].text)
             team_opponent_position_stats["DRB"] = float(raw_stat_table_row[11].text)
             team_opponent_position_stats["ORB"] = float(raw_stat_table_row[12].text)
-            team_opponent_position_stats["FG"] = float(re.findall(made_pattern, raw_stat_table_row[13].text)[0])
+            team_opponent_position_stats["FGM"] = float(re.findall(made_pattern, raw_stat_table_row[13].text)[0])
             team_opponent_position_stats["FGA"] = float(re.findall(attempted_pattern, raw_stat_table_row[13].text)[0])
-            team_opponent_position_stats["3P"] = float(re.findall(made_pattern, raw_stat_table_row[15].text)[0])
+            team_opponent_position_stats["3PM"] = float(re.findall(made_pattern, raw_stat_table_row[15].text)[0])
             team_opponent_position_stats["3PA"] = float(re.findall(attempted_pattern, raw_stat_table_row[15].text)[0])
-            team_opponent_position_stats["FT"] = float(re.findall(made_pattern, raw_stat_table_row[17].text)[0])
+            team_opponent_position_stats["FTM"] = float(re.findall(made_pattern, raw_stat_table_row[17].text)[0])
             team_opponent_position_stats["FTA"] = float(re.findall(attempted_pattern, raw_stat_table_row[17].text)[0])
 
             team_object_dict[team_abbrev].getOpponentStatsDict()[position] = team_opponent_position_stats
@@ -340,7 +353,7 @@ def generate_player_score(player):
     average_espn_points_for_position_for_opponents = espn_points_for_position_for_opponents / number_of_games
 
     raw_score = (espn_points_for_player + average_espn_points_for_position_for_opponents) / 2
-    
+
     adjusted_score = raw_score * number_of_games
     if number_of_games == 4:
         adjusted_score = adjusted_score * 0.90
@@ -395,6 +408,11 @@ def print_optimal_lineup(best_lineup, high_score, tested_permutations):
     print(f"\nTotal Projected Score: {high_score}\nNumber of Tested Permutations: {tested_permutations}")                                     
 
 if __name__ == "__main__":
+    # Get league scoring settings
+    get_scoring_settings_from_espn()
+
+    print(scoring_settings)
+
     # Create objects for each team
     for team_name in team_abbreviation_to_name_dict.keys():
         team_object_dict[team_name] = Team(team_name)

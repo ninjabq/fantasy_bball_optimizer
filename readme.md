@@ -28,8 +28,7 @@ Two important things you need to do!
 Then, just run the script!
 
 ## Current list of things to do
-1. Make script automatically pull scoring settings
-2. Automatate weighting of projected vs. current season stats based on how many games have been played this season
-3. Potentially add support for waivers, somehow...
-4. Maybe add support for daily lineup changes (probably would tell you who to set each day for the following week)
-5. Maybe add support for H2H category leagues and/or rotisserie leagues
+1. Automatate weighting of projected vs. current season stats based on how many games have been played this season
+2. Potentially add support for waivers, somehow...
+3. Maybe add support for daily lineup changes (probably would tell you who to set each day for the following week)
+4. Maybe add support for H2H category leagues and/or rotisserie leagues
