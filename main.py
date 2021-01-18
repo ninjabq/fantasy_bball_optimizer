@@ -23,6 +23,8 @@ team_object_dict = {}
 player_object_dict = {}
 scoring_settings = {}
 
+sum_of_alL_scores = 0
+
 class Player():
     '''
     Class representing a player, containing information that will be used to
@@ -274,7 +276,7 @@ def scrape_bbref_player(player_object, player_full_name, player_last_name, playe
 
     # Grab the player's team
     try:
-        player_team = current_season_stats[0].findAll('td', attrs={'data-stat':'team_id'})[0].text
+        player_team = current_season_stats[-1].findAll('td', attrs={'data-stat':'team_id'})[0].text
     except IndexError:
         player_team = soup.findAll('tr',attrs={'id':f'per_game.20{current_year - 1}'})[0].findAll('td', attrs={'data-stat':'team_id'})[0].text
     player_object.setPlayerTeam(player_team)
@@ -383,12 +385,14 @@ def recurse_lineup(fantasy_position_to_player_dict, current_lineup_players, posi
     Recursively check the given position and dict's permutations until we get to a full lineup. Once we get to a full
     lineup, check the score and see if it higher.
     '''
+    global sum_of_alL_scores
     for player in fantasy_position_to_player_dict[fantasy_team_position_list[position_index]]:
         if player not in current_lineup_players:
             current_score += player_object_dict[player].getPlayerScore()
             current_lineup_players.append(player)
             if position_index == (len(fantasy_position_to_player_dict.keys()) - 1):
                 tested_permutations += 1
+                sum_of_alL_scores += current_score
                 if current_score > high_score:
                     high_score = current_score
                     best_lineup = [player for player in current_lineup_players]
@@ -423,7 +427,7 @@ def print_optimal_lineup(best_lineup, high_score, tested_permutations):
     for index in range(len(best_lineup)):
         print(f"{fantasy_team_position_list[index]}: {best_lineup[index]} - Projected Score: {player_object_dict[best_lineup[index]].getPlayerScore()}")
 
-    print(f"\nTotal Projected Score: {high_score}\nNumber of Tested Permutations: {tested_permutations}")                                     
+    print(f"\nTotal Projected Score: {high_score}\nNumber of Tested Permutations: {tested_permutations}\nSum Of All Scores: {sum_of_alL_scores}\nAverage Score:{sum_of_alL_scores/tested_permutations}")                                
 
 if __name__ == "__main__":
     # Get league scoring settings
